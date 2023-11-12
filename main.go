@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"os"
 
@@ -52,12 +53,52 @@ func run() error {
 		return fmt.Errorf("couldn't create Reddit client: %w", err)
 	}
 
-	sub, _, err := redditClient.Subreddit.Get(context.Background(), "monsteraday")
+	postsReq, err := redditClient.NewJSONRequest("GET", "r/monsteraday/hot?limit=1", nil)
 	if err != nil {
-		return fmt.Errorf("couldn't get subreddit info: %w", err)
+		return fmt.Errorf("couldn't create request: %w", err)
 	}
 
-	printJSON(sub)
+	postsRes, err := redditClient.Do(context.Background(), postsReq, nil)
+	if err != nil {
+		return fmt.Errorf("couldn't get posts: %w", err)
+	}
+	defer postsRes.Body.Close()
+
+	var listing RedditListing
+	if err := json.NewDecoder(postsRes.Body).Decode(&listing); err != nil {
+		return fmt.Errorf("couldn't parse response body: %w", err)
+	}
+
+	for _, post := range listing.Data.Children {
+		if post.Data.MediaMetadata == nil {
+			continue
+		}
+
+		galleryImageIDs := Map(post.Data.GalleryData.Items, func(i GalleryDataItem) string {
+			return i.MediaID
+		})
+
+		imageURLs := Map(galleryImageIDs, func(id string) string {
+			metadata := post.Data.MediaMetadata[id]
+			for _, image := range metadata.PreviewImages {
+				if image.Width >= 640 {
+					return image.URL
+				}
+			}
+
+			return metadata.OriginalImage.URL
+		})
+
+		decodedImageURLs := Map(imageURLs, func(u string) string {
+			return html.UnescapeString(u)
+		})
+
+		fmt.Println(post.Data.Title)
+		for _, u := range decodedImageURLs {
+			fmt.Printf("- %s\n", u)
+		}
+		fmt.Println()
+	}
 
 	return nil
 }
@@ -65,4 +106,60 @@ func run() error {
 func printJSON(v any) {
 	b, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(string(b))
+}
+
+type RedditListing struct {
+	Kind string `json:"kind"`
+	Data struct {
+		After     string      `json:"after"`
+		Dist      int         `json:"dist"`
+		Modhash   interface{} `json:"modhash"`
+		GeoFilter interface{} `json:"geo_filter"`
+		Children  []struct {
+			Kind string     `json:"kind"`
+			Data RedditPost `json:"data"`
+		} `json:"children"`
+	} `json:"data"`
+}
+
+type RedditPost struct {
+	GalleryData struct {
+		Items []GalleryDataItem `json:"items"`
+	} `json:"gallery_data"`
+	MediaMetadata map[string]MediaMetadata `json:"media_metadata"`
+	URL           string                   `json:"url"`
+	Author        string                   `json:"author"`
+	Title         string                   `json:"title"`
+}
+
+type GalleryDataItem struct {
+	OutboundURL string `json:"outbound_url"`
+	MediaID     string `json:"media_id"`
+	ID          int    `json:"id"`
+}
+
+type MediaMetadata struct {
+	Status        string `json:"status"`
+	Type          string `json:"e"`
+	MimeType      string `json:"m"`
+	PreviewImages []struct {
+		Height int    `json:"y"`
+		Width  int    `json:"x"`
+		URL    string `json:"u"`
+	} `json:"p"`
+	OriginalImage struct {
+		Height int    `json:"y"`
+		Width  int    `json:"x"`
+		URL    string `json:"u"`
+	} `json:"s"`
+	ID string `json:"id"`
+}
+
+func Map[T, U any](tt []T, fn func(T) U) []U {
+	var res []U
+	for _, t := range tt {
+		res = append(res, fn(t))
+	}
+
+	return res
 }
