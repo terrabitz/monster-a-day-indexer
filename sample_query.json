@@ -1,0 +1,27 @@
+{
+  "model": "gpt-4-vision-preview",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "This is a D&D 5e monster statblock. Please output the following information in JSON format: challenge rating, armor class, type, name, and size."
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "https://preview.redd.it/the-jiangshi-from-our-upcoming-kickstarter-300-mythological-v0-8idapuapzhyb1.png?width=1636&format=png&auto=webp&s=4469fb46653fba65a08172aa502b58416b03acc1"
+          }
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "https://preview.redd.it/the-jiangshi-from-our-upcoming-kickstarter-300-mythological-v0-oaoujlipzhyb1.png?width=1636&format=png&auto=webp&s=17f880fb46b7dd16061690c73aa32f23cbf31d2f"
+          }
+        }
+      ]
+    }
+  ],
+  "max_tokens": 300
+}
