@@ -43,7 +43,16 @@ func doRequest[T any](ctx context.Context, client *OpenAIClient, method string, 
 }
 
 func (c *OpenAIClient) GetChatCompletion(ctx context.Context, req GetChatCompletionRequest) (GetChatCompletionResponse, error) {
-	return doRequest[GetChatCompletionResponse](ctx, c, http.MethodPost, "https://api.openai.com/v1/chat/completions", req)
+	ret, err := doRequest[GetChatCompletionResponse](ctx, c, http.MethodPost, "https://api.openai.com/v1/chat/completions", req)
+	if err != nil {
+		return GetChatCompletionResponse{}, fmt.Errorf("error making API request: %w", err)
+	}
+
+	if ret.Error != nil {
+		return GetChatCompletionResponse{}, fmt.Errorf("error making API request: %s", ret.Error.Message)
+	}
+
+	return ret, nil
 }
 
 type GetChatCompletionRequest struct {
@@ -86,4 +95,10 @@ type GetChatCompletionResponse struct {
 		} `json:"finish_details"`
 		Index int `json:"index"`
 	} `json:"choices"`
+	Error *struct {
+		Message string      `json:"message"`
+		Type    string      `json:"type"`
+		Param   interface{} `json:"param"`
+		Code    interface{} `json:"code"`
+	} `json:"error,omitempty"`
 }

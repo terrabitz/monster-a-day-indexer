@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"html"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/caarlos0/env/v10"
 	"github.com/joho/godotenv"
@@ -114,7 +116,7 @@ func run() error {
 
 		promptPart := GetChatCompletionRequestPart{
 			Type: "text",
-			Text: "This is a D&D 5e monster statblock. Please output the following information in JSON format: challenge rating (as key 'cr'), armor class (as key 'ac'), type, name, and size.",
+			Text: "This provided image is a D&D 5e monster statblock. Please read the following pieces of information from the image, and output them in CSV format without any header and each value in double-quotes: name, challenge rating, armor class, type, and size. If you cannot find a statblock, return a string starting with \"error:\"  and a short message containing the problem.",
 		}
 
 		parts := []GetChatCompletionRequestPart{}
@@ -132,14 +134,23 @@ func run() error {
 			},
 		}
 
-		printJSON(openAIReq)
-
 		res, err := openAIClient.GetChatCompletion(context.Background(), openAIReq)
 		if err != nil {
 			return fmt.Errorf("couldn't get OpenAI chat completions: %w", err)
 		}
 
-		printJSON(res)
+		chatResponse := res.Choices[0].Message.Content
+		if strings.HasPrefix(chatResponse, "error:") {
+			return fmt.Errorf("error while parsing image: %s", strings.TrimPrefix(chatResponse, "error:"))
+		}
+
+		csvReader := csv.NewReader(strings.NewReader(chatResponse))
+		records, err := csvReader.ReadAll()
+		if err != nil {
+			return fmt.Errorf("error reading CSV: %w", err)
+		}
+
+		fmt.Printf("%v\n", records)
 	}
 
 	return nil
