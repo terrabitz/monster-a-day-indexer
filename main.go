@@ -53,6 +53,8 @@ func run() error {
 		return fmt.Errorf("couldn't create Reddit client: %w", err)
 	}
 
+	openAIClient := NewOpenAIClient(cfg.OpenAIToken)
+
 	postsReq, err := redditClient.NewJSONRequest("GET", "r/monsteraday/hot?limit=1", nil)
 	if err != nil {
 		return fmt.Errorf("couldn't create request: %w", err)
@@ -98,6 +100,46 @@ func run() error {
 			fmt.Printf("- %s\n", u)
 		}
 		fmt.Println()
+
+		imageParts := Map(decodedImageURLs, func(u string) GetChatCompletionRequestPart {
+			return GetChatCompletionRequestPart{
+				Type: "image_url",
+				ImageURL: struct {
+					URL string "json:\"url\""
+				}{
+					URL: u,
+				},
+			}
+		})
+
+		promptPart := GetChatCompletionRequestPart{
+			Type: "text",
+			Text: "This is a D&D 5e monster statblock. Please output the following information in JSON format: challenge rating (as key 'cr'), armor class (as key 'ac'), type, name, and size.",
+		}
+
+		parts := []GetChatCompletionRequestPart{}
+		parts = append(parts, promptPart)
+		parts = append(parts, imageParts...)
+
+		openAIReq := GetChatCompletionRequest{
+			Model:     "gpt-4-vision-preview",
+			MaxTokens: 300,
+			Messages: []GetChatCompletionRequestMessage{
+				{
+					Role:    "user",
+					Content: parts,
+				},
+			},
+		}
+
+		printJSON(openAIReq)
+
+		res, err := openAIClient.GetChatCompletion(context.Background(), openAIReq)
+		if err != nil {
+			return fmt.Errorf("couldn't get OpenAI chat completions: %w", err)
+		}
+
+		printJSON(res)
 	}
 
 	return nil
