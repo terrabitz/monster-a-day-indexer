@@ -33,7 +33,6 @@ func doRequest[T any](ctx context.Context, client *OpenAIClient, method string, 
 	defer res.Body.Close()
 
 	raw, _ := io.ReadAll(res.Body)
-	fmt.Println(string(raw))
 
 	if err := json.Unmarshal(raw, &resObject); err != nil {
 		return resObject, fmt.Errorf("error parsing response body: %w", err)

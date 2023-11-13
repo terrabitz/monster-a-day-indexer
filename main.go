@@ -57,7 +57,7 @@ func run() error {
 
 	openAIClient := NewOpenAIClient(cfg.OpenAIToken)
 
-	postsReq, err := redditClient.NewJSONRequest("GET", "r/monsteraday/hot?limit=1", nil)
+	postsReq, err := redditClient.NewJSONRequest("GET", "r/monsteraday/hot?limit=10", nil)
 	if err != nil {
 		return fmt.Errorf("couldn't create request: %w", err)
 	}
@@ -85,7 +85,7 @@ func run() error {
 		imageURLs := Map(galleryImageIDs, func(id string) string {
 			metadata := post.Data.MediaMetadata[id]
 			for _, image := range metadata.PreviewImages {
-				if image.Width >= 640 {
+				if image.Width >= 1080 {
 					return image.URL
 				}
 			}
@@ -96,12 +96,6 @@ func run() error {
 		decodedImageURLs := Map(imageURLs, func(u string) string {
 			return html.UnescapeString(u)
 		})
-
-		fmt.Println(post.Data.Title)
-		for _, u := range decodedImageURLs {
-			fmt.Printf("- %s\n", u)
-		}
-		fmt.Println()
 
 		imageParts := Map(decodedImageURLs, func(u string) GetChatCompletionRequestPart {
 			return GetChatCompletionRequestPart{
@@ -116,7 +110,7 @@ func run() error {
 
 		promptPart := GetChatCompletionRequestPart{
 			Type: "text",
-			Text: "This provided image is a D&D 5e monster statblock. Please read the following pieces of information from the image, and output them in CSV format without any header and each value in double-quotes: name, challenge rating, armor class, type, and size. If you cannot find a statblock, return a string starting with \"error:\"  and a short message containing the problem.",
+			Text: "The provided images may contain one or more D&D 5e monster statblocks. Please read the following pieces of information from each statblock, and output them in CSV format without any header and each value in double-quotes: name, challenge, armor class, type, and size. If you cannot find any statblocks, return a string starting with \"error:\"  and a short message containing the problem.",
 		}
 
 		parts := []GetChatCompletionRequestPart{}
@@ -147,6 +141,7 @@ func run() error {
 		csvReader := csv.NewReader(strings.NewReader(chatResponse))
 		records, err := csvReader.ReadAll()
 		if err != nil {
+			fmt.Println(chatResponse)
 			return fmt.Errorf("error reading CSV: %w", err)
 		}
 
